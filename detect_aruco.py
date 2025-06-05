@@ -51,9 +51,10 @@ if __name__ == "__main__":
         # rvec是旋转向量， tvec是平移向量
         rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners, 0.045, intr_matrix, intr_coeffs)
         try:
-            print(corners)
-            print(rvec)
-            print(tvec)
+            print("Ids:\n", ids)
+            print("Corners:\n", corners)
+            print("Rvec:\n", rvec)
+            print("Tvec:\n", tvec)
         	# 在图片上标出aruco码的位置
             aruco.drawDetectedMarkers(rgb, corners)
             # 根据aruco码的位姿标注出对应的xyz轴, 0.05对应length参数，代表xyz轴画出来的长度 

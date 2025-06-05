@@ -10,49 +10,6 @@ from spatialmath import *
 
 
 def visjac_p(uv, depth,K):
-    r"""
-    Visual Jacobian for point features
-
-    :param p: image plane point or points
-    :type p: array_like(2), ndarray(2,N)
-    :param depth: point depth
-    :type depth: float, array_like(N)
-    :return: visual Jacobian matrix
-    :rtype: ndarray(2,6), ndarray(2N,6)
-
-    Compute the image Jacobian :math:`\mat{J}` which maps
-
-    .. math::
-
-        \dvec{p} = \mat{J}(\vec{p}, z) \vec{\nu}
-
-    camera spatial velocity :math:`\vec{\nu}` to the image plane velocity
-    :math:`\dvec{p}` of the point.
-
-    If ``p`` describes multiple points then return a stack of these
-    :math:`2\times 6` matrices, one per point.
-
-    Depth is the z-component of the point's coordinate in the camera frame.
-    If ``depth`` is a scalar then it is the depth for all points.
-
-    Example:
-
-    .. runblock:: pycon
-
-        >>> from machinevisiontoolbox import CentralCamera
-        >>> from spatialmath import SE3
-        >>> camera = CentralCamera.Default()
-        >>> camera.visjac_p((200, 300), 2)
-
-    :references:
-        - A tutorial on Visual Servo Control, Hutchinson, Hager & Corke,
-            IEEE Trans. R&A, Vol 12(5), Oct, 1996, pp 651-670.
-        - Robotics, Vision & Control for Python, Section 15.2.1, P. Corke,
-            Springer 2023.
-
-    :seealso: :meth:`flowfield` :meth:`visjac_p_polar` :meth:`visjac_l` :meth:`visjac_e`
-    """
-
     uv = base.getmatrix(uv, (2, None))
     Z = depth
 
@@ -86,27 +43,6 @@ def visjac_p(uv, depth,K):
 
 
 def get_K(fu=0.008,fv=0.008,rhou=1e-05,rhov=1e-05,u0=250.0,v0=250.0):
-        """
-        Intrinsic matrix of camera
-
-        :return: intrinsic matrix
-        :rtype: ndarray(3,3)
-
-        Return the camera intrinsic matrix.
-
-        Example:
-
-        .. runblock:: pycon
-
-            >>> from machinevisiontoolbox import CentralCamera
-            >>> camera = CentralCamera.Default(name='camera1')
-            >>> camera.K
-
-        :references: 
-            - Robotics, Vision & Control for Python, Section 13.1, P. Corke, Springer 2023.
-
-        :seealso: :meth:`C` :meth:`pp` :meth:`rho`
-        """
         # fmt: off
         K = np.array([[fu / rhou, 0,                   u0],
                       [ 0,                  fv / rhov, v0],
@@ -170,7 +106,7 @@ def servo(ur5,detected_points,depth_image,target_points,lambda_gain,f,resolution
     # 获得机械臂末端位姿
     current_pos = ur5.get_tcp()
 
-    print(current_pos)
+    print(current_pos[3:])
 
     current_object_pos = current_pos[:3]
     current_object_rot = current_pos[3:]
@@ -196,14 +132,13 @@ def servo(ur5,detected_points,depth_image,target_points,lambda_gain,f,resolution
     translation = next_T_matrix.t
     R = next_T_matrix.R  # 提取旋转矩阵
 
-    # 使用 SO3 提取 xyz 顺序的 RPY 角（单位为弧度）
-    rotation_rpy = rotation_matrix_to_euler_xyz(R)
+    gamma, beta, alpha = rotation_matrix_to_euler_xyz(R)
+    rotation_rpy = [gamma, beta, alpha]
     print(rotation_rpy)
     
     new_pos = np.hstack((translation, rotation_rpy)).reshape(1, 6).squeeze()
-    print(new_pos)
 
-    #ur5.servoL(new_pos)
+    ur5.servoL(new_pos)
 
 
 

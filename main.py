@@ -70,7 +70,7 @@ def get_aligned_images():
     img_color = np.asanyarray(aligned_color_frame.get_data())
     img_depth = np.asanyarray(aligned_depth_frame.get_data())
     intr_matrix = np.array([
-        [img_color.fx, 0, img_color.ppx], [0, img_color.fy, img_color.ppy], [0, 0, 1]
+        [color_intrin.fx, 0, color_intrin.ppx], [0, color_intrin.fy, color_intrin.ppy], [0, 0, 1]
     ])
     return color_intrin, depth_intrin, img_color, img_depth, aligned_depth_frame, np.array(color_intrin.coeffs), intr_matrix
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     HOST = '192.168.111.10'
 
     # 初始化UR5机械位姿
-    first_tcp = np.array([-0.21562, -0.06627, 0.49635, 0.854, 2.473, -2.682])
+    first_tcp = np.array([-0.33293, -0.06617, 0.54294, 1.431, 2.354, -2.534])
 
     ur5 = UR_BASE(HOST,first_tcp)
 
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     print("初始位姿:",ur5.get_tcp())
 
     # 控制增益
-    lambda_gain = 0.03
+    lambda_gain = 0.0002
 
     pipeline = rs.pipeline()
     config = rs.config()
@@ -129,12 +129,16 @@ if __name__ == "__main__":
         # 估计出aruco码的位姿，0.045对应markerLength参数，单位是meter
         # rvec是旋转向量， tvec是平移向量
         rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners, 0.045, intr_matrix, intr_coeffs)
-
-        if rvec and tvec:
+        if rvec is not None and tvec is not None:
             aruco.drawDetectedMarkers(img_color, corners)
+            print("Corners:\n", corners)
+            print("Rvec:\n", rvec)
+            print("Tvec:\n", tvec)
             # 根据aruco码的位姿标注出对应的xyz轴, 0.05对应length参数，代表xyz轴画出来的长度
-            aruco.drawAxis(img_color, intr_matrix, intr_coeffs, rvec, tvec, 0.05)
-            detected_points = corners
+            #aruco.drawAxis(img_color, intr_matrix, intr_coeffs, rvec, tvec, 0.05)
+
+            detected_points = corners[0][0]
+
             average_x = (detected_points[0][0] + detected_points[1][0] + detected_points[2][0] + detected_points[3][0]) / 4
             average_y = (detected_points[0][1] + detected_points[1][1] + detected_points[2][1] + detected_points[3][1]) / 4
             # 得到中心点坐标
