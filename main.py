@@ -5,7 +5,6 @@ import pyrealsense2 as rs
 from Servo import servo
 from UR_Base import UR_BASE
 import cv2
-# 提示没有aruco的看问题汇总
 import cv2.aruco as aruco
 
 def resize_and_center_box(target_points, image_size, padding=0):
@@ -81,16 +80,17 @@ if __name__ == "__main__":
     HOST = '192.168.111.10'
 
     # 初始化UR5机械位姿
-    first_tcp = np.array([-0.33293, -0.06617, 0.54294, 1.431, 2.354, -2.534])
+    first_tcp = np.array([-0.500, -0.309, 0.723, 1.052, 2.361, -2.665])
 
     ur5 = UR_BASE(HOST,first_tcp)
 
-    time.sleep(2)
-
-    print("初始位姿:",ur5.get_tcp())
+    time.sleep(5)
 
     # 控制增益
-    lambda_gain = 0.0002
+    lambda_gain = np.array([0.008, 0.008, 0.008, 0.007, 0.007, 0.007])
+
+    # 构造对角矩阵
+    lambda_gain = np.diag(lambda_gain)
 
     pipeline = rs.pipeline()
     config = rs.config()
@@ -121,22 +121,15 @@ if __name__ == "__main__":
         f = [color_intrin.fx,color_intrin.fy]
         resolution = [color_intrin.width,color_intrin.height]
 
-        aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
+        aruco_dict = aruco.Dictionary_get(aruco.DICT_ARUCO_ORIGINAL)
         # 创建detector parameters
         parameters = aruco.DetectorParameters_create()
         # 输入rgb图, aruco的dictionary, 相机内参, 相机的畸变参数
         corners, ids, rejected_img_points = aruco.detectMarkers(img_color, aruco_dict, parameters=parameters,cameraMatrix=intr_matrix, distCoeff=intr_coeffs)
-        # 估计出aruco码的位姿，0.045对应markerLength参数，单位是meter
         # rvec是旋转向量， tvec是平移向量
-        rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners, 0.045, intr_matrix, intr_coeffs)
+        rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners, 0.094, intr_matrix, intr_coeffs)
         if rvec is not None and tvec is not None:
             aruco.drawDetectedMarkers(img_color, corners)
-            print("Corners:\n", corners)
-            print("Rvec:\n", rvec)
-            print("Tvec:\n", tvec)
-            # 根据aruco码的位姿标注出对应的xyz轴, 0.05对应length参数，代表xyz轴画出来的长度
-            #aruco.drawAxis(img_color, intr_matrix, intr_coeffs, rvec, tvec, 0.05)
-
             detected_points = corners[0][0]
 
             average_x = (detected_points[0][0] + detected_points[1][0] + detected_points[2][0] + detected_points[3][0]) / 4

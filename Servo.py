@@ -7,6 +7,7 @@ from machinevisiontoolbox.base import *
 from machinevisiontoolbox import *
 from spatialmath.base import *
 from spatialmath import *
+from scipy.spatial.transform import Rotation as R
 
 
 def visjac_p(uv, depth,K):
@@ -52,26 +53,6 @@ def get_K(fu=0.008,fv=0.008,rhou=1e-05,rhov=1e-05,u0=250.0,v0=250.0):
         return K
 
 
-def rotation_matrix_to_euler_xyz(R):
-    """将旋转矩阵转换为X-Y-Z顺序的欧拉角（弧度）"""
-    
-    # 计算绕Y轴的旋转角度beta
-    s = R[0, 2]
-    c = -np.sqrt(1 - s**2)  # 强制cos_beta为负，以匹配用户案例
-    beta = np.arctan2(s, c)
-    
-    # 计算cos(beta)并防止除以零
-    cos_beta = c
-    
-    # 计算绕Z轴的旋转角度gamma
-    gamma = np.arctan2(-R[0, 1]/cos_beta, R[0, 0]/cos_beta)
-    
-    # 计算绕X轴的旋转角度alpha
-    alpha = np.arctan2(-R[1, 2]/cos_beta, R[2, 2]/cos_beta)
-    
-    return gamma, beta, alpha
-
-
 
 def servo(ur5,detected_points,depth_image,target_points,lambda_gain,f,resolution,center_point):
 
@@ -97,8 +78,7 @@ def servo(ur5,detected_points,depth_image,target_points,lambda_gain,f,resolution
     error_rms = np.sqrt(np.mean(e**2))
     print("误差:",error_rms)
 
-    v = -lambda_gain * np.linalg.pinv(J) @ e
-
+    v = -lambda_gain @ np.linalg.pinv(J) @ e
 
     # 重新计算位姿增量 Td
     Td = SE3.Delta(v)
@@ -106,39 +86,42 @@ def servo(ur5,detected_points,depth_image,target_points,lambda_gain,f,resolution
     # 获得机械臂末端位姿
     current_pos = ur5.get_tcp()
 
-    print(current_pos[3:])
-
     current_object_pos = current_pos[:3]
     current_object_rot = current_pos[3:]
 
-    T_translation = SE3(current_object_pos)
-    T_rotation = SE3.RPY(current_object_rot,order='xyz',unit='rad')
+    T_rotation = R.from_rotvec(np.array(current_object_rot)).as_matrix()
+    T_matrix = SE3.Rt(R=T_rotation,t=current_object_pos)
 
-    T_rotation_to_world = SE3.Rx(current_object_rot[0]) * SE3.Ry(current_object_rot[1]) * SE3.Rz(current_object_rot[2])
-
-    T_matrix = T_translation * T_rotation
-    T_matrix_to_world = T_translation * T_rotation_to_world
-
-    T_world_d = T_matrix_to_world @ Td @ T_matrix_to_world.inv()
+    T_world_d = T_matrix @ Td @ T_matrix.inv()
     next_T_matrix = T_world_d @ T_matrix
 
-
-    print("当前位姿齐次表示:\n",T_translation * T_rotation)
+    print("当前位姿齐次表示:\n",T_matrix)
     print("当前位姿增量在相机坐标系下:\n",Td)
     print("当前位姿增量在世界坐标系下:\n",T_world_d)
     print("下一步位姿齐次表示:\n",next_T_matrix)
 
     # 提取平移部分
     translation = next_T_matrix.t
-    R = next_T_matrix.R  # 提取旋转矩阵
+    Rotation_matrix = next_T_matrix.R  # 提取旋转矩阵
 
-    gamma, beta, alpha = rotation_matrix_to_euler_xyz(R)
-    rotation_rpy = [gamma, beta, alpha]
-    print(rotation_rpy)
+    rotation_vector = R.from_matrix(Rotation_matrix).as_rotvec()  # 将旋转矩阵转换为旋转向量
+
+    # 将平移和旋转向量组合成一个6维向量
+    next_tcp = np.concatenate((translation, rotation_vector))
+
+    print(current_pos)
+    print(next_tcp)
+
+    test1 = next_tcp[3]-current_pos[3]
+    test2 = next_tcp[4]-current_pos[4]
+    test3 = next_tcp[5]-current_pos[5]
+    if abs(test1) > 0.1 or abs(test2) > 0.1 or abs(test3) > 0.1:
+        print("旋转角度过大，跳过此次运动")
+        return
     
-    new_pos = np.hstack((translation, rotation_rpy)).reshape(1, 6).squeeze()
+    ur5.servoL(next_tcp)
 
-    ur5.servoL(new_pos)
+    #time.sleep(0.3)
 
 
 
