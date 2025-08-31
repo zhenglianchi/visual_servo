@@ -6,58 +6,7 @@ from Servo import servo
 from UR_Base import UR_BASE
 import cv2
 import cv2.aruco as aruco
-
-def resize_and_center_box(target_points, image_size, padding=0):
-    if len(target_points) != 4:
-        raise ValueError("目标框必须包含四个点。")
-
-    points = np.array(target_points, dtype=np.float32)
-
-    center = np.mean(points, axis=0)
-    image_center = np.array([image_size[0] / 2, image_size[1] / 2])
-
-    moved_points = points + (image_center - center)
-
-    v1 = moved_points[1] - moved_points[0]
-    v2 = moved_points[3] - moved_points[0]
-
-    width = np.linalg.norm(v1)
-    height = np.linalg.norm(v2)
-
-    half_w = width / 2
-    half_h = height / 2
-
-    rect_points = np.array([
-        [-half_w, -half_h],
-        [ half_w, -half_h],
-        [ half_w,  half_h],
-        [-half_w,  half_h]
-    ])
-
-    rect_points += image_center
-
-    center_rect = np.mean(rect_points, axis=0)
-    rect_points = np.array([
-        [
-            rect_points[i][0] + (rect_points[i][0] - center_rect[0]) * padding / max(width, height),
-            rect_points[i][1] + (rect_points[i][1] - center_rect[1]) * padding / max(width, height)
-        ]
-        for i in range(4)
-    ])
-
-    x_coords = [p[0] for p in rect_points]
-    y_coords = [p[1] for p in rect_points]
-    x_min, x_max = int(min(x_coords)), int(max(x_coords))
-    y_min, y_max = int(min(y_coords)), int(max(y_coords))
-
-    rect_points = [
-        [x_min, y_min],  # 左上
-        [x_max, y_min],  # 右上
-        [x_max, y_max],  # 右下
-        [x_min, y_max]   # 左下
-    ]
-
-    return rect_points
+from smart_adjustments import generate_target_points_auto_scale
 
 def get_aligned_images():
     frames = pipeline.wait_for_frames()
@@ -76,6 +25,7 @@ def get_aligned_images():
 
 if __name__ == "__main__":
     global img_color
+    target_distance = 1  # 米（你想停在多远，就改这里）
 
     HOST = '192.168.111.10'
 
@@ -83,8 +33,6 @@ if __name__ == "__main__":
     first_tcp = np.array([-0.500, -0.309, 0.723, 1.052, 2.361, -2.665])
 
     ur5 = UR_BASE(HOST,first_tcp)
-
-    time.sleep(5)
 
     # 控制增益
     lambda_gain = np.array([0.008, 0.008, 0.008, 0.007, 0.007, 0.007])
@@ -137,7 +85,13 @@ if __name__ == "__main__":
             # 得到中心点坐标
             center_point = (average_x, average_y)
 
-            target_points = resize_and_center_box(detected_points,resolution)
+            # ✅ 使用免标定方法生成目标点
+            target_points = generate_target_points_auto_scale(
+                current_corners=corners[0][0],
+                current_tvec=tvec[0][0],
+                target_distance=target_distance,
+                image_resolution=resolution
+            )
 
             for point in target_points:
                 cv2.circle(img_color, point, 3, (255, 255, 255), -1)
@@ -145,10 +99,9 @@ if __name__ == "__main__":
             uv = np.array(detected_points).T
             p_star = np.array(target_points).T
 
-            print("检测点为:\n",uv)
-            print("目标点为:\n",p_star)
+            #print("检测点为:\n",uv)
+            #print("目标点为:\n",p_star)
             
-            #try:
             servo(ur5,uv,img_depth,p_star,lambda_gain,f,resolution,center_point)
         else:
             detected_points = None
