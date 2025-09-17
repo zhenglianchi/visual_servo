@@ -42,3 +42,5 @@ def generate_target_points_auto_scale(current_corners, current_tvec, target_dist
     ])
 
     return target_points
+
+

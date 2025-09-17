@@ -25,15 +25,16 @@ def get_aligned_images():
 
 if __name__ == "__main__":
     global img_color
-    target_distance = 1  # 米（你想停在多远，就改这里）
+    target_distance = 0.45  # 米（你想停在多远，就改这里）
 
     HOST = '192.168.111.10'
 
     # 初始化UR5机械位姿
-    first_tcp = np.array([-0.500, -0.309, 0.723, 1.052, 2.361, -2.665])
+    first_tcp = np.array([0.029125568130258156, -0.21169816738266292, 0.8085129143669209, -0.7182055727080571, 1.9599717985725258, -1.6564796217293596])
 
-    ur5 = UR_BASE(HOST,first_tcp)
+    ur5 = UR_BASE(HOST, fisrt_tcp=first_tcp)
 
+    time.sleep(20)
     # 控制增益
     lambda_gain = np.array([0.008, 0.008, 0.008, 0.007, 0.007, 0.007])
 

@@ -60,4 +60,4 @@ class UR_BASE(object):
 
     def servoL(self, pose, speed=0.01, acc=0.02):
         pose = pose.tolist()
-        self.rtde_c.servoL(pose, speed, acc, 0.01, 0.05, 300)
+        self.rtde_c.servoL(pose, speed, acc, 0.05, 0.05, 300)
